@@ -1,4 +1,5 @@
 node_modules/
+public/obits.json
 *.log
 .DS_Store
 .env

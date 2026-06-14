@@ -52,12 +52,25 @@ function tickClock() {
 }
 
 // ---------- data ----------
+// Try the live Node API first (local `npm start`); if it isn't there — e.g. on
+// GitHub Pages, which is a static host — fall back to the JSON the build Action
+// bakes into the site.
+async function fetchPayload(force) {
+  try {
+    const res = await fetch("api/obits" + (force ? "?refresh=1" : ""));
+    if (res.ok) return await res.json();
+  } catch (_) {
+    /* no live server — fall through to static data */
+  }
+  const res = await fetch("obits.json?t=" + Date.now());
+  if (!res.ok) throw new Error("no data source (API " + res.status + ")");
+  return await res.json();
+}
+
 async function loadFeed({ force = false } = {}) {
   setStatus("FETCHING FEED…", "");
   try {
-    const res = await fetch("/api/obits" + (force ? "?refresh=1" : ""));
-    if (!res.ok) throw new Error("API " + res.status);
-    const data = await res.json();
+    const data = await fetchPayload(force);
     state.payload = data;
     state.all = data.rows || [];
     applyView();
