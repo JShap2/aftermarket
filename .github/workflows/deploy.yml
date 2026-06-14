@@ -8,7 +8,7 @@ on:
     - cron: "17 * * * *" # refresh the baked-in obit data hourly
 
 permissions:
-  contents: read
+  contents: write # to commit the persisted memory file back to the repo
   pages: write
   id-token: write
 
@@ -32,6 +32,21 @@ jobs:
 
       - name: Bake feed data into the static site
         run: node scripts/build-static.js
+
+      # Persist the lightweight memory file so the time series survives between
+      # runs. The "[skip ci]" tag stops this commit from re-triggering the
+      # workflow (which would otherwise loop on every push).
+      - name: Persist memory
+        run: |
+          git config user.name "aftermarket-bot"
+          git config user.email "actions@users.noreply.github.com"
+          if ! git diff --quiet -- data/memory.json; then
+            git add data/memory.json
+            git commit -m "chore: update memory snapshot [skip ci]"
+            git push origin HEAD:main
+          else
+            echo "No memory changes to persist."
+          fi
 
       - uses: actions/configure-pages@v5
 

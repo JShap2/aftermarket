@@ -2,34 +2,34 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>nyt.obituaries — feed</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>aftermarket — lifespan exchange</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div id="app" class="terminal">
-      <!-- Top status bar -->
+      <!-- Status strip -->
       <header class="topbar">
         <div class="brand">
-          <span class="brand-name">nyt.obituaries</span>
-          <span class="brand-sub">/ feed</span>
+          <span class="brand-name">aftermarket</span>
+          <span class="brand-sub">/ lifespan exchange</span>
         </div>
         <div class="topbar-fields">
           <div class="field">
-            <span class="field-label">FEED</span>
-            <span class="field-val" id="feed-name">NYT / OBITS</span>
-          </div>
-          <div class="field">
-            <span class="field-label">INDEX·AVG AGE</span>
-            <span class="field-val accent" id="index-val">—</span>
-          </div>
-          <div class="field">
-            <span class="field-label">LISTINGS</span>
-            <span class="field-val" id="count-val">—</span>
-          </div>
-          <div class="field">
             <span class="field-label">SRC</span>
-            <span class="field-val" id="source-pill">…</span>
+            <span class="field-val" id="src-val">—</span>
+          </div>
+          <div class="field">
+            <span class="field-label">OPEN</span>
+            <span class="field-val" id="open-val">—</span>
+          </div>
+          <div class="field">
+            <span class="field-label">SETTLED</span>
+            <span class="field-val" id="settled-val">—</span>
+          </div>
+          <div class="field">
+            <span class="field-label">AVG SETTLE</span>
+            <span class="field-val" id="avg-val">—</span>
           </div>
           <div class="field">
             <span class="field-label">UTC</span>
@@ -38,36 +38,26 @@
         </div>
       </header>
 
-      <!-- Primary element: the ticker wall (multiple scrolling lanes) -->
+      <!-- Primary: the ticker wall -->
       <section class="ticker-wall" id="ticker-wall" aria-label="ticker">
         <div class="ticker-empty" id="ticker-empty">LOADING FEED…</div>
       </section>
 
-      <!-- Secondary, compact: register + detail -->
-      <main class="grid">
-        <section class="board" aria-label="obituary register">
-          <div class="board-head">
-            <div class="col-sym">SYM</div>
-            <div class="col-name">DECEDENT</div>
-            <div class="col-cat">SECTOR</div>
-            <div class="col-num">LAST</div>
-            <div class="col-num">CHG</div>
-            <div class="col-num">%CHG</div>
-            <div class="col-time">TAPE</div>
-          </div>
-          <div class="board-body" id="board-body">
-            <div class="board-empty" id="board-empty">LOADING FEED…</div>
-          </div>
-        </section>
-
-        <aside class="detail" id="detail">
-          <div class="detail-head">RECORD</div>
-          <div class="detail-body" id="detail-body">
-            <div class="detail-hint">
-              SELECT A RECORD TO INSPECT. ↑/↓ NAVIGATE · ENTER OPENS SOURCE
-            </div>
-          </div>
-        </aside>
+      <!-- Secondary: the register (full width) -->
+      <main class="register" aria-label="register">
+        <div class="reg-head">
+          <div class="c-sym">SYM</div>
+          <div class="c-name">NAME</div>
+          <div class="c-status">STATUS</div>
+          <div class="c-src">SRC</div>
+          <div class="c-num c-vol">VOL</div>
+          <div class="c-num c-chg">CHG</div>
+          <div class="c-num c-settle">SETTLE</div>
+          <div class="c-time">LAST</div>
+        </div>
+        <div class="reg-body" id="reg-body">
+          <div class="reg-empty" id="reg-empty">LOADING FEED…</div>
+        </div>
       </main>
 
       <!-- Command line -->
@@ -78,11 +68,24 @@
           class="cmd-input"
           type="text"
           autocomplete="off"
+          autocapitalize="off"
           spellcheck="false"
-          placeholder="type to filter — or HELP, REFRESH, SORT AGE, LIVE…"
+          placeholder="search a name — or HELP, REFRESH, SORT TREND/VOL/SETTLE, OPEN, SETTLED…"
         />
         <span class="cmd-status" id="cmd-status"></span>
       </footer>
+    </div>
+
+    <!-- Person "stock" overlay -->
+    <div class="stock" id="stock" hidden>
+      <div class="stock-backdrop" id="stock-backdrop"></div>
+      <div class="stock-panel" role="dialog" aria-modal="true" aria-label="contract detail">
+        <div class="stock-bar">
+          <span class="stock-bar-title">CONTRACT</span>
+          <button class="stock-close" id="stock-close" aria-label="close">ESC ✕</button>
+        </div>
+        <div class="stock-body" id="stock-body"></div>
+      </div>
     </div>
 
     <script src="app.js"></script>

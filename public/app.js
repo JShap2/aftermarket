@@ -1,60 +1,59 @@
-// AFTERMARKET — front-end controller for the obituaries ticker.
+// aftermarket — lifespan exchange front-end.
+// People are unified entities (a "contract"); obituaries settle them.
 
 const state = {
-  all: [], // full row set from the API
-  view: [], // filtered/sorted rows currently rendered
-  payload: null, // last API payload (meta)
-  selected: null, // selected symbol
+  people: [],
+  view: [],
+  payload: null,
   filter: "",
-  sort: "tape", // tape | age | sym | name | chg
-  refreshTimer: null,
+  sort: "trend",
+  selected: null,
 };
 
 const REFRESH_MS = 5 * 60 * 1000;
+const $ = (s) => document.querySelector(s);
 
-const $ = (sel) => document.querySelector(sel);
+// ---------- formatting ----------
+const fmt = (n, d = 0) =>
+  n == null || Number.isNaN(n)
+    ? "—"
+    : n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 
-// ---------- formatting helpers ----------
-function fmtNum(n, digits = 0) {
+function signed(n, d = 0) {
   if (n == null || Number.isNaN(n)) return "—";
-  return n.toLocaleString("en-US", {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
+  return (n > 0 ? "+" : "") + n.toFixed(d);
 }
-
-function signed(n, digits = 2) {
-  if (n == null || Number.isNaN(n)) return "—";
-  const s = n > 0 ? "+" : "";
-  return s + n.toFixed(digits);
-}
-
-function arrow(dir) {
-  return dir === "up" ? "▲" : dir === "down" ? "▼" : "■";
-}
+const arrow = (dir) => (dir === "up" ? "▲" : dir === "down" ? "▼" : "■");
 
 function timeAgo(ts) {
   if (!ts) return "—";
-  const diff = Date.now() - ts;
-  const m = Math.floor(diff / 60000);
+  const m = Math.floor((Date.now() - ts) / 60000);
   if (m < 1) return "now";
   if (m < 60) return m + "m";
   const h = Math.floor(m / 60);
   if (h < 24) return h + "h";
-  const d = Math.floor(h / 24);
-  return d + "d";
+  return Math.floor(h / 24) + "d";
+}
+function fmtDate(ts) {
+  if (!ts) return "—";
+  return new Date(ts).toISOString().slice(0, 10);
+}
+
+const SPARK = "▁▂▃▄▅▆▇█";
+function spark(values) {
+  if (!values.length) return "";
+  const max = Math.max(1, ...values);
+  return values
+    .map((v) => SPARK[Math.min(SPARK.length - 1, Math.round((v / max) * (SPARK.length - 1)))])
+    .join("");
 }
 
 // ---------- clock ----------
 function tickClock() {
-  const d = new Date();
-  $("#clock").textContent = d.toISOString().slice(11, 19);
+  $("#clock").textContent = new Date().toISOString().slice(11, 19);
 }
 
 // ---------- data ----------
-// Try the live Node API first (local `npm start`); if it isn't there — e.g. on
-// GitHub Pages, which is a static host — fall back to the JSON the build Action
-// bakes into the site.
 async function fetchPayload(force) {
   try {
     const res = await fetch("api/obits" + (force ? "?refresh=1" : ""));
@@ -68,40 +67,48 @@ async function fetchPayload(force) {
 }
 
 async function loadFeed({ force = false } = {}) {
-  setStatus("FETCHING FEED…", "");
+  setStatus("FETCHING FEEDS…", "");
   try {
     const data = await fetchPayload(force);
     state.payload = data;
-    state.all = data.rows || [];
+    state.people = data.people || [];
     applyView();
     renderMeta();
     renderTickerWall();
+    const live = (data.sources || []).filter((s) => s.live).length;
+    const total = (data.sources || []).length;
     setStatus(
-      data.source === "live"
-        ? `LIVE FEED · ${data.count} LISTINGS`
-        : `SAMPLE DATA · FEED UNREACHABLE`,
-      data.source === "live" ? "ok" : "err"
+      `${data.count} CONTRACTS · ${live}/${total} SOURCES LIVE` +
+        (data.anyLive ? "" : " · SAMPLE DATA"),
+      data.anyLive ? "ok" : "err"
     );
+    // Keep an open stock ticket fresh after a refresh.
+    if (state.selected && !$("#stock").hidden) openStock(state.selected, { keepScroll: true });
   } catch (e) {
     setStatus("ERROR: " + e.message, "err");
   }
 }
 
-// ---------- view (filter + sort) ----------
+// ---------- view ----------
+function matches(p, f) {
+  if (!f) return true;
+  if (
+    p.symbol.toLowerCase().includes(f) ||
+    p.name.toLowerCase().includes(f) ||
+    p.sources.join(" ").toLowerCase().includes(f)
+  )
+    return true;
+  return (p.mentions || []).some((m) => (m.title || "").toLowerCase().includes(f));
+}
+
 function applyView() {
-  let rows = state.all.slice();
   const f = state.filter.trim().toLowerCase();
-  if (f) {
-    rows = rows.filter(
-      (r) =>
-        r.symbol.toLowerCase().includes(f) ||
-        r.name.toLowerCase().includes(f) ||
-        (r.category || "").toLowerCase().includes(f) ||
-        (r.title || "").toLowerCase().includes(f)
-    );
-  }
+  let rows = state.people.filter((p) => matches(p, f));
   switch (state.sort) {
-    case "age":
+    case "vol":
+      rows.sort((a, b) => b.volume - a.volume);
+      break;
+    case "settle":
       rows.sort((a, b) => (b.age ?? -1) - (a.age ?? -1));
       break;
     case "sym":
@@ -110,159 +117,195 @@ function applyView() {
     case "name":
       rows.sort((a, b) => a.name.localeCompare(b.name));
       break;
-    case "chg":
-      rows.sort((a, b) => (b.change ?? -999) - (a.change ?? -999));
+    case "status":
+      rows.sort((a, b) => a.status.localeCompare(b.status) || b.trendScore - a.trendScore);
       break;
-    default: // tape = recency (already sorted by API)
-      rows.sort((a, b) => (b.pubTs || 0) - (a.pubTs || 0));
+    case "last":
+      rows.sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
+      break;
+    default: // trend
+      rows.sort((a, b) => b.trendScore - a.trendScore);
   }
   state.view = rows;
-  renderBoard();
+  renderRegister();
 }
 
-// ---------- rendering ----------
+// ---------- meta ----------
 function renderMeta() {
   const p = state.payload;
   if (!p) return;
-  $("#index-val").textContent =
-    p.indexValue != null ? fmtNum(p.indexValue, 1) : "—";
-  $("#count-val").textContent = fmtNum(p.count);
-  const pill = $("#source-pill");
-  if (p.source === "live") {
-    pill.textContent = "● LIVE";
-    pill.className = "live";
-  } else {
-    pill.textContent = "● SAMPLE";
-    pill.className = "sample";
-  }
+  const live = (p.sources || []).filter((s) => s.live).length;
+  $("#src-val").textContent = `${live}/${(p.sources || []).length}`;
+  $("#open-val").textContent = fmt(p.aliveCount);
+  $("#settled-val").textContent = fmt(p.settledCount);
+  $("#avg-val").textContent = p.avgSettleAge != null ? fmt(p.avgSettleAge, 1) : "—";
 }
 
-// The ticker is the centerpiece: several stacked lanes, each scrolling the
-// full feed continuously. Lanes are rotated and run at different speeds (and
-// alternating directions) so the wall reads like a busy mechanical board.
-const LANE_COUNT = 6;
+// ---------- ticker wall ----------
+const LANE_COUNT = 3;
 
-function tickerItemHtml(r) {
-  const dir = r.direction || "flat";
-  const chg =
-    r.change == null
-      ? "·"
-      : `${arrow(dir)}${signed(r.change, 1)}`;
-  return `<span class="tk-item" data-sym="${r.symbol}"><span class="tk-sym">${
-    r.symbol
-  }</span><span class="tk-last">${r.age ?? "—"}</span><span class="tk-chg ${dir}">${chg}</span></span>`;
+function tickerItemHtml(p) {
+  const dir = p.direction || "flat";
+  const mark = p.status === "settled" ? "†" : "";
+  const quote = p.status === "settled" ? p.age ?? "—" : "OPEN";
+  return `<span class="tk-item ${p.status}" data-sym="${p.symbol}"><span class="tk-sym">${
+    p.symbol
+  }${mark}</span><span class="tk-last">${quote}</span><span class="tk-chg ${dir}">${arrow(
+    dir
+  )}</span></span>`;
 }
 
 function renderTickerWall() {
   const wall = $("#ticker-wall");
-  const rows = state.all;
+  const rows = state.people;
   if (!rows.length) {
-    wall.innerHTML = `<div class="ticker-empty">NO DATA.</div>`;
+    wall.innerHTML = `<div class="ticker-empty">NO CONTRACTS.</div>`;
     return;
   }
   let html = "";
   for (let i = 0; i < LANE_COUNT; i++) {
-    // Rotate each lane's starting point so adjacent lanes don't line up.
-    const off = (i * 3) % rows.length;
+    const off = (i * 5) % rows.length;
     const rot = rows.slice(off).concat(rows.slice(0, off));
     const seq = rot.concat(rot); // doubled => seamless -50% loop
-    const dur = 60 + i * 14; // vary speed per lane
-    const rev = i % 2 ? " rev" : ""; // alternate scroll direction
+    const dur = 70 + i * 18;
+    const rev = i % 2 ? " rev" : "";
     html += `<div class="lane${rev}"><div class="lane-track" style="animation-duration:${dur}s">${seq
       .map(tickerItemHtml)
       .join("")}</div></div>`;
   }
   wall.innerHTML = html;
   wall.querySelectorAll(".tk-item").forEach((el) => {
-    el.addEventListener("click", () => selectSymbol(el.dataset.sym, { scroll: true }));
+    el.addEventListener("click", () => openStock(el.dataset.sym));
   });
 }
 
-function renderBoard() {
-  const body = $("#board-body");
+// ---------- register ----------
+function renderRegister() {
+  const body = $("#reg-body");
   if (!state.view.length) {
-    body.innerHTML = `<div class="board-empty">${
-      state.all.length ? "NO MATCHES FOR FILTER." : "NO DATA."
+    body.innerHTML = `<div class="reg-empty">${
+      state.people.length ? "NO MATCHES." : "NO DATA."
     }</div>`;
     return;
   }
   body.innerHTML = state.view
-    .map((r) => {
-      const dir = r.direction || "flat";
-      const sel = r.symbol === state.selected ? " selected" : "";
-      return `<div class="board-row${sel}" data-sym="${r.symbol}" tabindex="0">
-        <div class="sym">${r.symbol}</div>
-        <div class="name" title="${escapeAttr(r.name)}">${escapeHtml(r.name)}</div>
-        <div class="cat">${escapeHtml(r.category || "")}</div>
-        <div class="col-num last">${r.age ?? "—"}</div>
-        <div class="col-num ${dir}">${r.change == null ? "—" : signed(r.change, 1)}</div>
-        <div class="col-num ${dir}">${
-        r.changePct == null ? "—" : signed(r.changePct, 1) + "%"
-      }</div>
-        <div class="col-time">${timeAgo(r.pubTs)}</div>
+    .map((p) => {
+      const dir = p.direction || "flat";
+      const chg = p.volChange ? signed(p.volChange) : arrow(dir);
+      const sel = p.symbol === state.selected ? " selected" : "";
+      return `<div class="reg-row${sel}" data-sym="${p.symbol}" tabindex="0">
+        <div class="c-sym sym">${p.symbol}${p.status === "settled" ? "†" : ""}</div>
+        <div class="c-name" title="${escAttr(p.name)}">${esc(p.name)}</div>
+        <div class="c-status ${p.status}">${p.status === "settled" ? "SETTLED" : "OPEN"}</div>
+        <div class="c-src">${esc(p.sources.join(" "))}</div>
+        <div class="c-num c-vol">${p.volume}</div>
+        <div class="c-num c-chg ${dir}">${chg}</div>
+        <div class="c-num c-settle">${p.age ?? "—"}</div>
+        <div class="c-time">${timeAgo(p.lastSeen)}</div>
+      </div>`;
+    })
+    .join("");
+  body.querySelectorAll(".reg-row").forEach((el) => {
+    el.addEventListener("click", () => openStock(el.dataset.sym));
+  });
+}
+
+// ---------- stock overlay ----------
+function openStock(sym, { keepScroll = false } = {}) {
+  const p = state.people.find((x) => x.symbol === sym);
+  if (!p) return;
+  state.selected = sym;
+  renderStock(p);
+  const overlay = $("#stock");
+  overlay.hidden = false;
+  if (!keepScroll) $("#stock-body").scrollTop = 0;
+  // reflect selection in register
+  document.querySelectorAll(".reg-row").forEach((el) =>
+    el.classList.toggle("selected", el.dataset.sym === sym)
+  );
+}
+function closeStock() {
+  $("#stock").hidden = true;
+}
+
+function renderStock(p) {
+  const dir = p.direction || "flat";
+  const settled = p.status === "settled";
+  const hist = (p.history || []).map((h) => h.count);
+  const histMax = Math.max(0, ...hist);
+  const volSeries = (p.series || []).map((s) => s.vol);
+
+  const mentions = (p.mentions || [])
+    .map((m) => {
+      const flag = m.isDeath ? `<span class="m-flag">SETTLEMENT</span>` : "";
+      const link = m.link
+        ? `<a href="${escAttr(m.link)}" target="_blank" rel="noopener">${esc(m.title)}</a>`
+        : esc(m.title);
+      return `<div class="m-row">
+        <div class="m-meta"><span class="m-code">${esc(m.sourceCode)}</span><span class="m-time">${timeAgo(
+        m.pubTs
+      )}</span>${flag}</div>
+        <div class="m-title">${link}</div>
       </div>`;
     })
     .join("");
 
-  body.querySelectorAll(".board-row").forEach((el) => {
-    el.addEventListener("click", () => selectSymbol(el.dataset.sym));
-  });
-}
-
-function selectSymbol(sym, { scroll = false } = {}) {
-  state.selected = sym;
-  document.querySelectorAll(".board-row").forEach((el) => {
-    el.classList.toggle("selected", el.dataset.sym === sym);
-    if (scroll && el.dataset.sym === sym) {
-      el.scrollIntoView({ block: "nearest" });
-    }
-  });
-  renderDetail(state.all.find((r) => r.symbol === sym));
-}
-
-function renderDetail(r) {
-  const body = $("#detail-body");
-  if (!r) {
-    body.innerHTML = `<div class="detail-hint">LISTING NOT FOUND.</div>`;
-    return;
-  }
-  const dir = r.direction || "flat";
-  const pub = r.pubTs ? new Date(r.pubTs).toUTCString() : "—";
-  body.innerHTML = `
-    <div class="d-sym">${r.symbol}</div>
-    <div class="d-name">${escapeHtml(r.name)}</div>
-    <div class="d-quote">
-      <div class="d-last">${r.age ?? "—"}<span class="unit">YRS</span></div>
-      <div class="d-chg ${dir}">${arrow(dir)} ${
-    r.change == null ? "n/a" : signed(r.change, 1)
-  } ${r.changePct == null ? "" : "(" + signed(r.changePct, 1) + "%)"}</div>
+  $("#stock-body").innerHTML = `
+    <div class="st-top">
+      <div>
+        <div class="st-sym">${p.symbol}${settled ? "†" : ""}</div>
+        <div class="st-name">${esc(p.name)}</div>
+      </div>
+      <div class="st-badge ${p.status}">${settled ? "SETTLED" : "OPEN"}</div>
     </div>
-    <div class="d-stats">
-      <div class="d-stat"><div class="k">SECTOR</div><div class="v">${escapeHtml(
-        r.category || "—"
+
+    <div class="st-quote">
+      <div class="st-big">${settled ? p.age ?? "—" : "OPEN"}<span class="unit">${
+    settled ? "SETTLE AGE" : "POSITION"
+  }</span></div>
+      <div class="st-trend ${dir}">${arrow(dir)} ${
+    p.trendPct == null ? "n/a" : signed(p.trendPct, 0) + "% TREND"
+  }</div>
+    </div>
+
+    <div class="st-instrument">INSTRUMENT: LIFESPAN CONTRACT. ${
+      settled
+        ? `SETTLED ${fmtDate(p.settledAt)} AT AGE ${p.age ?? "UNKNOWN"} ON CONFIRMED OBITUARY. NO FURTHER ACTION.`
+        : `OPEN POSITION. SETTLES ON PUBLICATION OF A CONFIRMED OBITUARY.`
+    }</div>
+
+    <div class="st-stats">
+      <div class="st-stat"><div class="k">VOLUME</div><div class="v">${p.volume}</div></div>
+      <div class="st-stat"><div class="k">SOURCES</div><div class="v">${esc(
+        p.sources.join(" ")
       )}</div></div>
-      <div class="d-stat"><div class="k">VS INDEX</div><div class="v ${dir}">${
-    r.change == null ? "—" : signed(r.change, 1) + " yrs"
-  }</div></div>
-      <div class="d-stat"><div class="k">DESK</div><div class="v">${escapeHtml(
-        r.author || "—"
+      <div class="st-stat"><div class="k">FIRST SEEN</div><div class="v">${fmtDate(
+        p.firstObserved || p.firstSeen
       )}</div></div>
-      <div class="d-stat"><div class="k">TAPED</div><div class="v">${timeAgo(
-        r.pubTs
+      <div class="st-stat"><div class="k">LAST EVENT</div><div class="v">${timeAgo(
+        p.lastSeen
       )} AGO</div></div>
+      <div class="st-stat"><div class="k">SESSIONS</div><div class="v">${p.sessions ?? 0}</div></div>
+      <div class="st-stat"><div class="k">Δ SESSION</div><div class="v ${dir}">${
+    p.volChange ? signed(p.volChange) : "0"
+  }</div></div>
     </div>
-    <div class="d-section-label">HEADLINE</div>
-    <div class="d-headline">${escapeHtml(r.headline || r.title || "")}</div>
-    <div class="d-section-label">SUMMARY</div>
-    <div class="d-desc">${escapeHtml(r.description || "No summary available.")}</div>
-    <div class="d-section-label">SETTLEMENT · ${pub}</div>
+
+    <div class="st-section">ACTIVITY · MENTIONS / DAY (14D)</div>
+    <div class="st-spark" title="${(p.history || [])
+      .map((h) => h.day + ": " + h.count)
+      .join("  ")}">${spark(hist)} <span class="st-spark-max">peak ${histMax}/d</span></div>
     ${
-      r.link
-        ? `<a class="d-link" href="${escapeAttr(
-            r.link
-          )}" target="_blank" rel="noopener">OPEN SOURCE ↗</a>`
+      volSeries.length >= 2
+        ? `<div class="st-section">VOLUME SERIES · ${volSeries.length} SESSIONS</div>
+           <div class="st-spark">${spark(volSeries)}</div>`
         : ""
     }
+
+    <div class="st-section">TAPE · ${p.mentions.length} MENTION${
+    p.mentions.length === 1 ? "" : "S"
+  }</div>
+    <div class="m-list">${mentions}</div>
   `;
 }
 
@@ -274,71 +317,69 @@ function setStatus(text, cls) {
 }
 
 const HELP =
-  "COMMANDS: REFRESH · LIVE · SORT [AGE|SYM|NAME|CHG|TAPE] · CLEAR · HELP · or type any text to filter the board.";
+  "TYPE A NAME TO SEARCH · ENTER OPENS TOP MATCH · SORT [TREND|VOL|SETTLE|NAME|SYM|STATUS|LAST] · OPEN · SETTLED · REFRESH · CLEAR · HELP";
+
+function setFilter(v) {
+  state.filter = v;
+  applyView();
+}
 
 function runCommand(raw) {
   const cmd = raw.trim();
-  if (!cmd) {
-    state.filter = "";
-    applyView();
-    setStatus("FILTER CLEARED", "");
-    return;
-  }
   const upper = cmd.toUpperCase();
   const parts = upper.split(/\s+/);
 
-  if (upper === "HELP" || upper === "?") {
-    setStatus(HELP, "");
-    return;
-  }
-  if (upper === "REFRESH" || upper === "LIVE") {
-    loadFeed({ force: true });
-    return;
-  }
-  if (upper === "CLEAR") {
-    state.filter = "";
-    $("#cmd").value = "";
-    applyView();
+  if (!cmd) {
+    setFilter("");
     setStatus("FILTER CLEARED", "");
     return;
   }
+  if (upper === "HELP" || upper === "?") return setStatus(HELP, "");
+  if (upper === "REFRESH" || upper === "LIVE") return loadFeed({ force: true });
+  if (upper === "CLEAR") {
+    $("#cmd").value = "";
+    setFilter("");
+    return setStatus("FILTER CLEARED", "");
+  }
+  if (upper === "OPEN" || upper === "SETTLED") {
+    // status filter
+    const want = upper.toLowerCase();
+    state.filter = "";
+    state.view = state.people
+      .filter((p) => p.status === want)
+      .sort((a, b) => b.trendScore - a.trendScore);
+    renderRegister();
+    return setStatus(`${state.view.length} ${upper} CONTRACTS`, "ok");
+  }
   if (parts[0] === "SORT") {
     const key = (parts[1] || "").toLowerCase();
-    const valid = ["age", "sym", "name", "chg", "tape"];
+    const valid = ["trend", "vol", "settle", "sym", "name", "status", "last"];
     if (valid.includes(key)) {
       state.sort = key;
       applyView();
-      setStatus("SORTED BY " + key.toUpperCase(), "ok");
-    } else {
-      setStatus("SORT KEYS: AGE SYM NAME CHG TAPE", "err");
+      return setStatus("SORTED BY " + key.toUpperCase(), "ok");
     }
-    return;
+    return setStatus("SORT KEYS: " + valid.join(" ").toUpperCase(), "err");
   }
-  // Otherwise treat as a filter.
-  state.filter = cmd;
-  applyView();
-  const n = state.view.length;
-  setStatus(`FILTER "${cmd}" · ${n} MATCH${n === 1 ? "" : "ES"}`, n ? "ok" : "err");
-}
 
-// ---------- keyboard nav ----------
-function moveSelection(delta) {
-  if (!state.view.length) return;
-  let idx = state.view.findIndex((r) => r.symbol === state.selected);
-  idx = idx === -1 ? 0 : Math.min(state.view.length - 1, Math.max(0, idx + delta));
-  selectSymbol(state.view[idx].symbol, { scroll: true });
+  // Otherwise: a search. Filter, and open the top match.
+  setFilter(cmd);
+  if (state.view.length) {
+    openStock(state.view[0].symbol);
+    setStatus(`${state.view.length} MATCH${state.view.length === 1 ? "" : "ES"} · OPENED ${state.view[0].symbol}`, "ok");
+  } else {
+    setStatus(`NO MATCH FOR "${cmd}"`, "err");
+  }
 }
 
 // ---------- escaping ----------
-function escapeHtml(s) {
+function esc(s) {
   return String(s == null ? "" : s)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 }
-function escapeAttr(s) {
-  return escapeHtml(s).replace(/"/g, "&quot;");
-}
+const escAttr = (s) => esc(s).replace(/"/g, "&quot;");
 
 // ---------- init ----------
 function init() {
@@ -347,45 +388,35 @@ function init() {
 
   const cmd = $("#cmd");
   cmd.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      runCommand(cmd.value);
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      moveSelection(1);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      moveSelection(-1);
-    } else if (e.key === "Escape") {
+    if (e.key === "Enter") runCommand(cmd.value);
+    else if (e.key === "Escape") {
       cmd.value = "";
-      state.filter = "";
-      applyView();
+      setFilter("");
       setStatus("", "");
     }
   });
-  // Live-filter as you type (without clobbering explicit commands).
   cmd.addEventListener("input", () => {
     const v = cmd.value;
-    const isCommand = /^(refresh|live|help|clear|sort|\?)/i.test(v.trim());
-    if (!isCommand) {
-      state.filter = v;
-      applyView();
+    if (!/^(refresh|live|help|clear|sort|open|settled|\?)\b/i.test(v.trim())) {
+      setFilter(v); // live-filter as you type (the register narrows)
     }
   });
 
-  // Global keys: ENTER opens selected source, slash focuses command bar.
+  $("#stock-close").addEventListener("click", closeStock);
+  $("#stock-backdrop").addEventListener("click", closeStock);
+
   document.addEventListener("keydown", (e) => {
-    if (e.key === "/" && document.activeElement !== cmd) {
+    if (e.key === "Escape" && !$("#stock").hidden) {
+      closeStock();
+      e.stopPropagation();
+    } else if (e.key === "/" && document.activeElement !== cmd) {
       e.preventDefault();
       cmd.focus();
-    }
-    if (e.key === "Enter" && document.activeElement !== cmd && state.selected) {
-      const r = state.all.find((x) => x.symbol === state.selected);
-      if (r && r.link) window.open(r.link, "_blank", "noopener");
     }
   });
 
   loadFeed();
-  state.refreshTimer = setInterval(() => loadFeed({ force: true }), REFRESH_MS);
+  setInterval(() => loadFeed({ force: true }), REFRESH_MS);
 }
 
 document.addEventListener("DOMContentLoaded", init);

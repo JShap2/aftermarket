@@ -13,7 +13,10 @@ const out = join(__dirname, "..", "public", "obits.json");
 const payload = await getFeed({ force: true });
 await writeFile(out, JSON.stringify(payload));
 
+const srcSummary = payload.sources
+  .map((s) => `${s.code}:${s.live ? "live" : "sample"}(${s.count})`)
+  .join(" ");
 console.log(
-  `Wrote ${out} — source=${payload.source}, listings=${payload.count}` +
-    (payload.error ? `, note="${payload.error}"` : "")
+  `Wrote ${out} — people=${payload.count} ` +
+    `(open=${payload.aliveCount} settled=${payload.settledCount}) — sources: ${srcSummary}`
 );
