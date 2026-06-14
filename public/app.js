@@ -301,7 +301,9 @@ function lifeModelHtml(p) {
       <div class="surv-axis"><span>NOW</span><span>SURVIVAL P</span><span>+${maxT}Y</span></div>
     </div>
     ${mods ? `<div class="lm-mods">${mods}</div>` : ""}
-    <div class="lm-foot">PERIOD LIFE TABLE + EVENT HAZARD. ESTIMATE ONLY · CONF ${lm.confidence}${
+    <div class="lm-foot">${
+      p.birthDate ? `BORN ${esc(p.birthDate)} (WIKIDATA). ` : ""
+    }PERIOD LIFE TABLE + EVENT HAZARD. ESTIMATE ONLY · CONF ${lm.confidence}${
     lm.ageKnown ? "" : " · *ASSUMED AGE (UNVERIFIED)"
   }</div>`;
 }
