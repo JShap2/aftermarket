@@ -1,17 +1,18 @@
-/* Low-fi, mechanical terminal. Monochrome — no accent color, no branding,
-   no gloss. Think teletype / departure board / old data terminal. */
+/* Low-fi, mechanical terminal — but readable. Monochrome chrome with clear,
+   high-contrast text. The scrolling TICKER WALL is the centerpiece; the
+   register/detail are a compact strip beneath it. */
 :root {
-  --bg: #0a0a0a;
+  --bg: #080808;
   --panel: #0c0c0c;
-  --row: #0c0c0c;
-  --row-alt: #101010;
-  --line: #2b2b2b; /* dim hairline rules */
-  --line-soft: #1a1a1a;
-  --text: #b9b9b9;
-  --text-bright: #dcdcdc;
-  --text-dim: #6a6a6a;
-  --up: #8aa888; /* desaturated, low-key */
-  --down: #b08a8a;
+  --row: #0d0d0d;
+  --row-alt: #121212;
+  --line: #333333;
+  --line-soft: #1e1e1e;
+  --text: #d8d8d8; /* primary, high contrast */
+  --text-bright: #f4f4f4; /* symbols / headings */
+  --text-dim: #8c8c8c; /* labels, still legible */
+  --up: #5cc77d; /* readable, not neon */
+  --down: #e26d6d;
   --row-h: 24px;
 }
 
@@ -26,7 +27,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: "Courier New", Courier, "DejaVu Sans Mono", monospace;
-  font-size: 13px;
+  font-size: 14px;
   overflow: hidden;
 }
 
@@ -37,7 +38,7 @@ body {
   width: 100vw;
 }
 
-/* ---------- Top status strip (plain, no branding) ---------- */
+/* ---------- Top status strip ---------- */
 .topbar {
   display: flex;
   align-items: center;
@@ -45,30 +46,25 @@ body {
   background: var(--bg);
   color: var(--text);
   border-bottom: 1px solid var(--line);
-  min-height: 26px;
+  min-height: 28px;
   padding: 0 8px;
+  flex: 0 0 auto;
 }
-
 .brand {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  color: var(--text-dim);
-  font-size: 11px;
+  gap: 6px;
+  font-size: 12px;
 }
 .brand-mark {
   display: none;
 }
 .brand-name {
   color: var(--text);
-  font-weight: 400;
-  letter-spacing: 0;
 }
 .brand-sub {
   color: var(--text-dim);
-  font-size: 11px;
 }
-
 .topbar-fields {
   display: flex;
   align-items: center;
@@ -81,45 +77,57 @@ body {
   border-left: 1px solid var(--line-soft);
 }
 .field-label {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-dim);
 }
 .field-val {
   font-size: 12px;
   color: var(--text);
 }
-.field-val.accent {
-  color: var(--text);
-}
-
-#source-pill {
-  font-size: 11px;
-  color: var(--text-dim);
-}
+#source-pill,
 #source-pill.live,
 #source-pill.sample {
   color: var(--text-dim);
 }
 
-/* ---------- Ticker tape (seamless loop) ---------- */
-.tape {
-  position: relative;
-  overflow: hidden;
+/* ---------- TICKER WALL (primary, dominant) ---------- */
+.ticker-wall {
+  flex: 1 1 auto; /* owns the bulk of the screen */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   background: var(--bg);
-  border-bottom: 1px solid var(--line);
-  height: 26px;
+  overflow: hidden;
+}
+.ticker-empty {
+  padding: 20px;
+  color: var(--text-dim);
+}
+.lane {
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
   align-items: center;
+  overflow: hidden;
   white-space: nowrap;
+  border-bottom: 1px solid var(--line-soft);
 }
-.tape-track {
+.lane:last-child {
+  border-bottom: none;
+}
+.lane-track {
   display: inline-flex;
   align-items: center;
   will-change: transform;
-  /* Content is rendered twice; shifting by half the track loops seamlessly. */
-  animation: scroll-left 80s linear infinite;
+  animation-name: scroll-left;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  /* animation-duration set inline per lane */
 }
-.tape:hover .tape-track {
+.lane.rev .lane-track {
+  animation-name: scroll-right;
+}
+.ticker-wall:hover .lane-track {
   animation-play-state: paused;
 }
 @keyframes scroll-left {
@@ -130,38 +138,55 @@ body {
     transform: translateX(-50%);
   }
 }
-.tape-item {
+@keyframes scroll-right {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.tk-item {
   display: inline-flex;
   align-items: baseline;
-  gap: 6px;
-  padding: 0 16px;
+  gap: 10px;
+  padding: 0 26px;
   border-right: 1px solid var(--line-soft);
-  font-size: 12px;
+  font-size: clamp(16px, 2.5vh, 30px);
+  line-height: 1;
+  cursor: pointer;
 }
-.tape-sym {
+.tk-item:hover {
+  background: #161616;
+}
+.tk-sym {
   color: var(--text-bright);
+  font-weight: 700;
 }
-.tape-last {
+.tk-last {
   color: var(--text);
 }
-.tape-chg.up {
+.tk-chg {
+  font-size: 0.62em;
+}
+.tk-chg.up {
   color: var(--up);
 }
-.tape-chg.down {
+.tk-chg.down {
   color: var(--down);
 }
-.tape-chg.flat {
+.tk-chg.flat {
   color: var(--text-dim);
 }
 
-/* ---------- Main grid ---------- */
+/* ---------- Lower strip: register + detail (secondary, compact) ---------- */
 .grid {
-  flex: 1;
+  flex: 0 0 240px; /* fixed, compact — the ticker gets the rest */
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: 1fr 320px;
   min-height: 0;
+  border-top: 1px solid var(--line);
 }
-
 .board {
   display: flex;
   flex-direction: column;
@@ -169,18 +194,16 @@ body {
   border-right: 1px solid var(--line);
   background: var(--panel);
 }
-
 .board-head,
 .board-row {
   display: grid;
-  grid-template-columns: 64px 1fr 120px 56px 70px 70px 60px;
+  grid-template-columns: 60px 1fr 110px 52px 64px 64px 54px;
   align-items: center;
 }
 .board-head {
   background: var(--bg);
   color: var(--text-dim);
-  font-size: 10px;
-  font-weight: 400;
+  font-size: 11px;
   border-bottom: 1px solid var(--line);
   padding: 4px 0;
   position: sticky;
@@ -201,7 +224,6 @@ body {
   text-align: right;
   color: var(--text-dim);
 }
-
 .board-body {
   overflow-y: auto;
   flex: 1;
@@ -211,13 +233,12 @@ body {
   width: 9px;
 }
 .board-body::-webkit-scrollbar-thumb {
-  background: #222;
+  background: #2a2a2a;
   border: 2px solid var(--panel);
 }
-
 .board-row {
   height: var(--row-h);
-  font-size: 12px;
+  font-size: 13px;
   border-bottom: 1px solid var(--line-soft);
   cursor: pointer;
 }
@@ -228,9 +249,8 @@ body {
   background: var(--row);
 }
 .board-row:hover {
-  background: #161616;
+  background: #1b1b1b;
 }
-/* Mechanical selection: inverted, like a terminal cursor block. */
 .board-row.selected {
   background: var(--text);
   color: #000;
@@ -247,13 +267,14 @@ body {
 }
 .board-row .sym {
   color: var(--text-bright);
+  font-weight: 700;
 }
 .board-row .name {
   color: var(--text);
 }
 .board-row .cat {
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: 12px;
 }
 .board-row .last {
   color: var(--text);
@@ -267,9 +288,8 @@ body {
 .board-row .flat {
   color: var(--text-dim);
 }
-
 .board-empty {
-  padding: 20px;
+  padding: 14px;
   color: var(--text-dim);
 }
 
@@ -283,43 +303,42 @@ body {
 .detail-head {
   background: var(--bg);
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: 11px;
   padding: 5px 10px;
   border-bottom: 1px solid var(--line);
 }
 .detail-body {
-  padding: 12px;
+  padding: 10px 12px;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
 }
 .detail-hint {
   color: var(--text-dim);
-  font-size: 11px;
-  line-height: 1.7;
+  font-size: 12px;
+  line-height: 1.6;
 }
-
 .d-sym {
   color: var(--text-bright);
   font-size: 18px;
-  font-weight: 400;
+  font-weight: 700;
 }
 .d-name {
   font-size: 14px;
-  margin: 2px 0 10px;
+  margin: 1px 0 8px;
   color: var(--text);
 }
 .d-quote {
   display: flex;
   align-items: baseline;
   gap: 12px;
-  padding: 8px 0;
+  padding: 6px 0;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .d-last {
-  font-size: 24px;
+  font-size: 22px;
   color: var(--text-bright);
 }
 .d-last .unit {
@@ -339,44 +358,42 @@ body {
 .d-chg.flat {
   color: var(--text-dim);
 }
-
 .d-stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .d-stat {
   background: var(--panel);
   padding: 5px 8px;
 }
 .d-stat .k {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-dim);
 }
 .d-stat .v {
   font-size: 12px;
   color: var(--text);
 }
-
 .d-section-label {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-dim);
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 .d-headline {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-bright);
   line-height: 1.5;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .d-desc {
   font-size: 12px;
   color: var(--text);
   line-height: 1.6;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 .d-link {
   display: inline-block;
@@ -384,7 +401,7 @@ body {
   background: transparent;
   text-decoration: none;
   border: 1px solid var(--line);
-  font-size: 11px;
+  font-size: 12px;
   padding: 5px 10px;
 }
 .d-link:hover {
@@ -400,6 +417,7 @@ body {
   background: var(--bg);
   border-top: 1px solid var(--line);
   padding: 5px 8px;
+  flex: 0 0 auto;
 }
 .cmd-prompt {
   color: var(--text-dim);
@@ -414,11 +432,11 @@ body {
   caret-color: var(--text);
 }
 .cmd-input::placeholder {
-  color: #3a3a3a;
+  color: #444;
 }
 .cmd-status {
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: 12px;
 }
 .cmd-status.err,
 .cmd-status.ok {
@@ -428,6 +446,7 @@ body {
 @media (max-width: 820px) {
   .grid {
     grid-template-columns: 1fr;
+    flex-basis: 180px;
   }
   .detail {
     display: none;

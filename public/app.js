@@ -75,7 +75,7 @@ async function loadFeed({ force = false } = {}) {
     state.all = data.rows || [];
     applyView();
     renderMeta();
-    renderTape();
+    renderTickerWall();
     setStatus(
       data.source === "live"
         ? `LIVE FEED · ${data.count} LISTINGS`
@@ -137,27 +137,45 @@ function renderMeta() {
   }
 }
 
-function renderTape() {
-  const track = $("#tape-track");
+// The ticker is the centerpiece: several stacked lanes, each scrolling the
+// full feed continuously. Lanes are rotated and run at different speeds (and
+// alternating directions) so the wall reads like a busy mechanical board.
+const LANE_COUNT = 6;
+
+function tickerItemHtml(r) {
+  const dir = r.direction || "flat";
+  const chg =
+    r.change == null
+      ? "·"
+      : `${arrow(dir)}${signed(r.change, 1)}`;
+  return `<span class="tk-item" data-sym="${r.symbol}"><span class="tk-sym">${
+    r.symbol
+  }</span><span class="tk-last">${r.age ?? "—"}</span><span class="tk-chg ${dir}">${chg}</span></span>`;
+}
+
+function renderTickerWall() {
+  const wall = $("#ticker-wall");
   const rows = state.all;
   if (!rows.length) {
-    track.innerHTML = "";
+    wall.innerHTML = `<div class="ticker-empty">NO DATA.</div>`;
     return;
   }
-  // Duplicate the sequence so the loop reads continuously.
-  const seq = rows.concat(rows);
-  track.innerHTML = seq
-    .map((r) => {
-      const dir = r.direction || "flat";
-      const chg =
-        r.change == null
-          ? "n/a"
-          : `${arrow(dir)} ${signed(r.change, 1)} (${signed(r.changePct, 1)}%)`;
-      return `<span class="tape-item"><span class="tape-sym">${r.symbol}</span><span class="tape-last">${
-        r.age ?? "—"
-      }</span><span class="tape-chg ${dir}">${chg}</span></span>`;
-    })
-    .join("");
+  let html = "";
+  for (let i = 0; i < LANE_COUNT; i++) {
+    // Rotate each lane's starting point so adjacent lanes don't line up.
+    const off = (i * 3) % rows.length;
+    const rot = rows.slice(off).concat(rows.slice(0, off));
+    const seq = rot.concat(rot); // doubled => seamless -50% loop
+    const dur = 60 + i * 14; // vary speed per lane
+    const rev = i % 2 ? " rev" : ""; // alternate scroll direction
+    html += `<div class="lane${rev}"><div class="lane-track" style="animation-duration:${dur}s">${seq
+      .map(tickerItemHtml)
+      .join("")}</div></div>`;
+  }
+  wall.innerHTML = html;
+  wall.querySelectorAll(".tk-item").forEach((el) => {
+    el.addEventListener("click", () => selectSymbol(el.dataset.sym, { scroll: true }));
+  });
 }
 
 function renderBoard() {

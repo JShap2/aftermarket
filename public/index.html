@@ -38,14 +38,14 @@
         </div>
       </header>
 
-      <!-- Scrolling ticker tape -->
-      <div class="tape" id="tape" aria-label="ticker tape">
-        <div class="tape-track" id="tape-track"></div>
-      </div>
+      <!-- Primary element: the ticker wall (multiple scrolling lanes) -->
+      <section class="ticker-wall" id="ticker-wall" aria-label="ticker">
+        <div class="ticker-empty" id="ticker-empty">LOADING FEED…</div>
+      </section>
 
-      <!-- Main work area -->
+      <!-- Secondary, compact: register + detail -->
       <main class="grid">
-        <section class="board" aria-label="obituary board">
+        <section class="board" aria-label="obituary register">
           <div class="board-head">
             <div class="col-sym">SYM</div>
             <div class="col-name">DECEDENT</div>
@@ -61,12 +61,10 @@
         </section>
 
         <aside class="detail" id="detail">
-          <div class="detail-head">SECURITY DETAIL</div>
+          <div class="detail-head">RECORD</div>
           <div class="detail-body" id="detail-body">
             <div class="detail-hint">
-              SELECT A LISTING TO INSPECT.
-              <br /><br />
-              ↑ / ↓ TO NAVIGATE · ENTER TO OPEN SOURCE
+              SELECT A RECORD TO INSPECT. ↑/↓ NAVIGATE · ENTER OPENS SOURCE
             </div>
           </div>
         </aside>
