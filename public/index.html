@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AFTERMARKET — NYT Obituaries Terminal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="app" class="terminal">
+      <!-- Top status bar -->
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">▚</span>
+          <span class="brand-name">AFTERMARKET</span>
+          <span class="brand-sub">OBITUARIES TERMINAL</span>
+        </div>
+        <div class="topbar-fields">
+          <div class="field">
+            <span class="field-label">FEED</span>
+            <span class="field-val" id="feed-name">NYT / OBITS</span>
+          </div>
+          <div class="field">
+            <span class="field-label">INDEX·AVG AGE</span>
+            <span class="field-val accent" id="index-val">—</span>
+          </div>
+          <div class="field">
+            <span class="field-label">LISTINGS</span>
+            <span class="field-val" id="count-val">—</span>
+          </div>
+          <div class="field">
+            <span class="field-label">SRC</span>
+            <span class="field-val" id="source-pill">…</span>
+          </div>
+          <div class="field">
+            <span class="field-label">UTC</span>
+            <span class="field-val" id="clock">--:--:--</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Scrolling ticker tape -->
+      <div class="tape" id="tape" aria-label="ticker tape">
+        <div class="tape-track" id="tape-track"></div>
+      </div>
+
+      <!-- Main work area -->
+      <main class="grid">
+        <section class="board" aria-label="obituary board">
+          <div class="board-head">
+            <div class="col-sym">SYM</div>
+            <div class="col-name">DECEDENT</div>
+            <div class="col-cat">SECTOR</div>
+            <div class="col-num">LAST</div>
+            <div class="col-num">CHG</div>
+            <div class="col-num">%CHG</div>
+            <div class="col-time">TAPE</div>
+          </div>
+          <div class="board-body" id="board-body">
+            <div class="board-empty" id="board-empty">LOADING FEED…</div>
+          </div>
+        </section>
+
+        <aside class="detail" id="detail">
+          <div class="detail-head">SECURITY DETAIL</div>
+          <div class="detail-body" id="detail-body">
+            <div class="detail-hint">
+              SELECT A LISTING TO INSPECT.
+              <br /><br />
+              ↑ / ↓ TO NAVIGATE · ENTER TO OPEN SOURCE
+            </div>
+          </div>
+        </aside>
+      </main>
+
+      <!-- Command line -->
+      <footer class="cmdbar">
+        <span class="cmd-prompt">CMD&gt;</span>
+        <input
+          id="cmd"
+          class="cmd-input"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="type to filter — or HELP, REFRESH, SORT AGE, LIVE…"
+        />
+        <span class="cmd-status" id="cmd-status"></span>
+      </footer>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
