@@ -89,7 +89,7 @@ a {
 
 /* ---------- Ticker wall (primary, but compact) ---------- */
 .ticker-wall {
-  flex: 0 0 40vh;
+  flex: 0 0 auto; /* height = the thin lanes themselves, not a big block */
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -101,8 +101,8 @@ a {
   color: var(--text-dim);
 }
 .lane {
-  flex: 1 1 0;
-  min-height: 0;
+  flex: 0 0 auto;
+  height: 30px; /* thin row — hugs the text, minimal vertical whitespace */
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -412,8 +412,8 @@ a {
   .field { padding: 0 8px; }
   .field:first-child { padding-left: 0; border-left: none; }
 
-  .ticker-wall { flex-basis: 30vh; }
-  .tk-item { font-size: clamp(13px, 2.2vh, 18px); padding: 0 16px; }
+  .lane { height: 28px; }
+  .tk-item { font-size: clamp(13px, 2.2vh, 18px); padding: 0 14px; }
 
   /* Collapse the register to the columns that matter on a phone:
      SYM · NAME · STATUS · SETTLE · LAST */

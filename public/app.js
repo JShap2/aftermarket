@@ -142,7 +142,7 @@ function renderMeta() {
 }
 
 // ---------- ticker wall ----------
-const LANE_COUNT = 3;
+const LANE_COUNT = 4;
 
 function tickerItemHtml(p) {
   const dir = p.direction || "flat";
