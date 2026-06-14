@@ -160,9 +160,7 @@ a {
   color: var(--text);
 }
 .tk-item.open .tk-last {
-  color: var(--text-dim);
-  font-size: 0.7em;
-  letter-spacing: 0.05em;
+  color: var(--text);
 }
 .tk-chg {
   font-size: 0.7em;
@@ -237,6 +235,7 @@ a {
 .c-num.up { color: var(--up); }
 .c-num.down { color: var(--down); }
 .c-num.flat { color: var(--text-dim); }
+.c-settle.est { color: var(--text-dim); }
 .reg-empty { padding: 14px; color: var(--text-dim); }
 
 /* ---------- Command bar ---------- */
@@ -403,6 +402,53 @@ a {
 .m-title { font-size: 12.5px; line-height: 1.45; }
 .m-title a { text-decoration: none; }
 .m-title a:hover { text-decoration: underline; }
+
+/* ---------- Life-expectancy model ---------- */
+.lm-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.lm-stat { background: var(--panel); padding: 5px 8px; }
+.lm-stat .k { font-size: 9px; color: var(--text-dim); }
+.lm-stat .v { font-size: 14px; color: var(--text-bright); }
+.lm-stat .v.up { color: var(--up); }
+.lm-stat .v.down { color: var(--down); }
+
+.life-chart { margin-bottom: 8px; }
+.surv {
+  width: 100%;
+  height: 120px;
+  display: block;
+  background: #060606;
+  border: 1px solid var(--line);
+}
+.surv-base { fill: none; stroke: var(--text-dim); stroke-width: 0.6; vector-effect: non-scaling-stroke; stroke-dasharray: 2 2; }
+.surv-adj { fill: none; stroke: var(--text-bright); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.surv-grid { stroke: #2a2a2a; stroke-width: 0.5; vector-effect: non-scaling-stroke; }
+.surv-med { stroke: var(--down); stroke-width: 0.6; vector-effect: non-scaling-stroke; stroke-dasharray: 2 2; }
+.surv-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-top: 3px;
+}
+
+.lm-mods { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.lm-mod {
+  font-size: 10px;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+}
+.lm-mod.up { color: var(--up); border-color: var(--up); }
+.lm-mod.down { color: var(--down); border-color: var(--down); }
+
+.lm-note { font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
+.lm-foot { font-size: 10px; color: var(--text-dim); margin-bottom: 8px; line-height: 1.4; }
 
 /* ---------- Mobile ---------- */
 @media (max-width: 720px) {

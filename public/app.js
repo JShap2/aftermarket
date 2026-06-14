@@ -147,7 +147,12 @@ const LANE_COUNT = 4;
 function tickerItemHtml(p) {
   const dir = p.direction || "flat";
   const mark = p.status === "settled" ? "†" : "";
-  const quote = p.status === "settled" ? p.age ?? "—" : "OPEN";
+  const quote =
+    p.status === "settled"
+      ? p.age ?? "—"
+      : p.lifeModel && p.lifeModel.projectedAge != null
+      ? "~" + p.lifeModel.projectedAge
+      : "OPEN";
   return `<span class="tk-item ${p.status}" data-sym="${p.symbol}"><span class="tk-sym">${
     p.symbol
   }${mark}</span><span class="tk-last">${quote}</span><span class="tk-chg ${dir}">${arrow(
@@ -200,7 +205,13 @@ function renderRegister() {
         <div class="c-src">${esc(p.sources.join(" "))}</div>
         <div class="c-num c-vol">${p.volume}</div>
         <div class="c-num c-chg ${dir}">${chg}</div>
-        <div class="c-num c-settle">${p.age ?? "—"}</div>
+        <div class="c-num c-settle${p.status === "open" ? " est" : ""}">${
+        p.status === "settled"
+          ? p.age ?? "—"
+          : p.lifeModel && p.lifeModel.projectedAge != null
+          ? "~" + p.lifeModel.projectedAge
+          : "—"
+      }</div>
         <div class="c-time">${timeAgo(p.lastSeen)}</div>
       </div>`;
     })
@@ -226,6 +237,73 @@ function openStock(sym, { keepScroll = false } = {}) {
 }
 function closeStock() {
   $("#stock").hidden = true;
+}
+
+// Survival curve as a low-fi inline SVG. Two lines: baseline (cohort) and the
+// hazard-adjusted projection; a 50% gridline and a marker at projected
+// settlement (median survival).
+function survivalSvg(lm) {
+  const adj = lm.curve || [];
+  const base = lm.baseCurve || [];
+  if (adj.length < 2) return "";
+  const maxT = Math.max(adj[adj.length - 1].t, base.length ? base[base.length - 1].t : 0) || 1;
+  const X = (t) => ((t / maxT) * 100).toFixed(2);
+  const Y = (s) => (1 + (1 - s) * 40).toFixed(2);
+  const pts = (c) => c.map((p) => `${X(p.t)},${Y(p.s)}`).join(" ");
+  const med = adj.find((p) => p.s <= 0.5);
+  const medX = med ? X(med.t) : null;
+  const y50 = Y(0.5);
+  return `<svg class="surv" viewBox="0 0 100 42" preserveAspectRatio="none" aria-label="survival curve">
+    <line class="surv-grid" x1="0" y1="${y50}" x2="100" y2="${y50}"></line>
+    ${medX != null ? `<line class="surv-med" x1="${medX}" y1="1" x2="${medX}" y2="41"></line>` : ""}
+    ${base.length ? `<polyline class="surv-base" points="${pts(base)}"></polyline>` : ""}
+    <polyline class="surv-adj" points="${pts(adj)}"></polyline>
+  </svg>`;
+}
+
+function lifeModelHtml(p) {
+  const lm = p.lifeModel;
+  if (!lm) return "";
+  if (lm.status === "settled") {
+    return `<div class="st-section">LIFE EXPECTANCY MODEL</div>
+      <div class="lm-note">CONTRACT SETTLED. REALIZED AGE ${
+        lm.ageAtDeath ?? "UNKNOWN"
+      }. MODEL INACTIVE.</div>`;
+  }
+
+  const maxT = (lm.curve && lm.curve.length ? lm.curve[lm.curve.length - 1].t : 0);
+  const mods = (lm.modifiers || [])
+    .map(
+      (m) =>
+        `<span class="lm-mod ${m.worse ? "down" : "up"}">${esc(m.label)} ${esc(m.display)}${
+          m.source ? " (" + esc(m.source) + ")" : ""
+        }</span>`
+    )
+    .join("");
+
+  return `<div class="st-section">LIFE EXPECTANCY MODEL ${
+    lm.hazard && lm.hazard !== 1 ? `· HAZARD ×${lm.hazard}` : ""
+  }</div>
+    <div class="lm-grid">
+      <div class="lm-stat"><div class="k">AGE</div><div class="v">${lm.age}${
+    lm.ageKnown ? "" : "*"
+  }</div></div>
+      <div class="lm-stat"><div class="k">SEX</div><div class="v">${lm.sex || "—"}</div></div>
+      <div class="lm-stat"><div class="k">BASE LE</div><div class="v">${lm.baseLE}y</div></div>
+      <div class="lm-stat"><div class="k">ADJ. LE</div><div class="v ${
+        lm.adjustedLE < lm.baseLE ? "down" : lm.adjustedLE > lm.baseLE ? "up" : ""
+      }">${lm.adjustedLE}y</div></div>
+      <div class="lm-stat"><div class="k">PROJ. AGE</div><div class="v">${lm.projectedAge}</div></div>
+      <div class="lm-stat"><div class="k">EST. YEAR</div><div class="v">${lm.projectedYear}</div></div>
+    </div>
+    <div class="life-chart">
+      ${survivalSvg(lm)}
+      <div class="surv-axis"><span>NOW</span><span>SURVIVAL P</span><span>+${maxT}Y</span></div>
+    </div>
+    ${mods ? `<div class="lm-mods">${mods}</div>` : ""}
+    <div class="lm-foot">PERIOD LIFE TABLE + EVENT HAZARD. ESTIMATE ONLY · CONF ${lm.confidence}${
+    lm.ageKnown ? "" : " · *ASSUMED AGE (UNVERIFIED)"
+  }</div>`;
 }
 
 function renderStock(p) {
@@ -260,9 +338,13 @@ function renderStock(p) {
     </div>
 
     <div class="st-quote">
-      <div class="st-big">${settled ? p.age ?? "—" : "OPEN"}<span class="unit">${
-    settled ? "SETTLE AGE" : "POSITION"
-  }</span></div>
+      <div class="st-big">${
+        settled
+          ? p.age ?? "—"
+          : p.lifeModel && p.lifeModel.projectedAge != null
+          ? p.lifeModel.projectedAge
+          : "—"
+      }<span class="unit">${settled ? "SETTLE AGE" : "PROJ. SETTLE AGE"}</span></div>
       <div class="st-trend ${dir}">${arrow(dir)} ${
     p.trendPct == null ? "n/a" : signed(p.trendPct, 0) + "% TREND"
   }</div>
@@ -290,6 +372,8 @@ function renderStock(p) {
     p.volChange ? signed(p.volChange) : "0"
   }</div></div>
     </div>
+
+    ${lifeModelHtml(p)}
 
     <div class="st-section">ACTIVITY · MENTIONS / DAY (14D)</div>
     <div class="st-spark" title="${(p.history || [])
